@@ -1,0 +1,76 @@
+import re
+import json
+from bs4 import BeautifulSoup
+import pandas as pd
+#fetch the Javascript content
+from requests_html import HTMLSession
+
+def geturl(search_term, tab):
+    return 'https://finance.yahoo.com/quote/{}/{}?p={}'.format(search_term, tab, search_term)
+
+def main(search_term, tab):
+    json_data = getsoup(search_term, tab)
+    data = {}
+    #if tab == 'financials':
+    data = extract_financials(json_data)
+    df = pd.DataFrame(data)
+    csv = df.to_csv('C:/Users/suen6/PycharmProjects/Scraper_Yahoo/p.csv')
+    df = pd.read_csv(csv)
+    d = df.to_dict("split")
+    d = dict(zip(d["index"], d["data"]))
+
+
+def getsoup(search_term, tab):
+    session = HTMLSession()
+    response = session.get(geturl(search_term, tab))
+    soup = BeautifulSoup(response.text, 'html.parser')
+    # extract json formatted strings
+    pattern = re.compile(r'\s--\sData\s--\s')
+    script_data = soup.find('script', text=pattern).contents[0]
+    # find the starting position of the json string
+    start = script_data.find("context") - 2
+    # slice the json string
+    data = json.loads(script_data[start:-12])
+
+    return data
+
+def extract_financials(json_data):
+    # income statement
+    annual_is = json_data['context']['dispatcher']['stores']['QuoteSummaryStore']['incomeStatementHistoryQuarterly']['incomeStatementHistory']
+    quarterly_is = json_data['context']['dispatcher']['stores']['QuoteSummaryStore']['incomeStatementHistoryQuarterly']['incomeStatementHistory']
+
+    # cash flow statement
+    annual_cf = json_data['context']['dispatcher']['stores']['QuoteSummaryStore']['cashflowStatementHistory']['cashflowStatements']
+    quarterly_cf = json_data['context']['dispatcher']['stores']['QuoteSummaryStore']['cashflowStatementHistoryQuarterly']['cashflowStatements']
+
+    # balance sheet
+    annual_bs = json_data['context']['dispatcher']['stores']['QuoteSummaryStore']['balanceSheetHistory']['balanceSheetStatements']
+    quarterly_bs = json_data['context']['dispatcher']['stores']['QuoteSummaryStore']['balanceSheetHistoryQuarterly']['balanceSheetStatements']
+    """, quarterly_bs, annual_cf, quarterly_cf, annual_bs, quarterly_bs"""
+    tab_list = [annual_is]
+    data = []
+    for statement in tab_list:
+        data.append(extract_accounts_list(statement))
+    return data
+
+def extract_accounts_list(statment_data):
+    filtered_data = []
+    # consolidate annual
+    for s in statment_data:
+        statement = {}
+    for key, val in s.items():
+        try:
+            statement[key] = val['raw']
+        except TypeError:
+            continue
+        except KeyError:
+            continue
+    filtered_data.append(statement)
+    return filtered_data
+
+if __name__ == '__main__':
+    search_term = 'WISH'
+    tab = 'financials'
+    path = '.csv'
+
+    main(search_term,tab)
