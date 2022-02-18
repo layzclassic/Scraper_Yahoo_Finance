@@ -9,16 +9,16 @@ import os
 import os.path
 
 
-def main(ticker, path, pages, filter):
+def main(ticker, path, pages, filter_opt):
     # create instance of web driver
     web_driver(ticker)
     # choose filter method in drop down list
-    select_reaction(filter)
+    select_reaction(filter_opt)
     data = scrape_loop(pages)
     driver.close()
     headers = ['Index', 'Poster', 'Upvote', 'Downvote', 'Sentiment', 'Message']
     date = datetime.now().strftime("%y%m%d")
-    directory = date + '_{}.xlsx'.format(ticker)
+    directory = date + '_' + filter_opt + '_' + str(pages) + '_pages_{}.xlsx'.format(ticker)
     try:
         df = pd.DataFrame(data, columns=headers)
         df.to_excel(os.path.join(path, directory))
@@ -27,9 +27,9 @@ def main(ticker, path, pages, filter):
         print('failed', e)
 
 
-def select_reaction(filter):
+def select_reaction(filter_opt):
     click_by_text('Top Reactions')
-    click_by_text(filter)
+    click_by_text(filter_opt)
 
 
 def test(element):
@@ -74,7 +74,7 @@ def show_more(pages):
     try:
         for i in range(pages):
             click_by_text('Show more')
-            print('Pages:', pages)
+            print('Pages:', i)
     except Exception as e:
         print('page', e)
         pass
@@ -128,6 +128,6 @@ def build_chrome_options():
 if __name__ == '__main__':
     ticker = 'WISH'
     path = r'C:\Users\suen6\PycharmProjects\Scraper_Yahoo_Finance\data'
-    pages = 10
-    filter = 'Newest Reactions'
-    main(ticker, path, pages, filter)
+    pages = 2
+    filter_opt = 'Newest Reactions'
+    main(ticker, path, pages, filter_opt)
