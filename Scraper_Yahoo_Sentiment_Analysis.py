@@ -48,8 +48,8 @@ def main(file, path):
     cleaned_data = clean_dataframe(df)
     # append messages to respective list
     parse_data(cleaned_data)
-    # process messages
-
+    # export messages
+    export_text(path)
     # save(summary, file, path)
     save(file, path)
 
@@ -93,9 +93,26 @@ def parse_data(cleaned_data):
             # match row to dictionary
             sentiment = sentiment_types[data.sentiment_type]
             sentiment.add_data_row(data)
-    for sentiment_type in sentiment_types.values():
-        # convert object to string and create Doc container
-        sentiment_type.str = sentiment_type.list_to_doc(sentiment_type.message)
+    # for sentiment_type in sentiment_types.values():
+    #     # convert object to string and create Doc container
+    #     sentiment_type.str = sentiment_type.list_to_doc(sentiment_type.message)
+
+
+def list_to_string(list):
+    text = ''
+    return text.join(list)
+
+
+def export_text(path):
+    for name, sentiment_type in sentiment_types.items():
+        doc = list_to_string(sentiment_type.message)
+        doc.replace("\n", " ")
+        directory = name + '_text_sample.txt'
+        with open(os.path.join(path, directory), 'w', encoding='utf-8') as f:
+            for line in doc:
+                f.write(line)
+
+    print('text saved')
 
 
 def save(file, path):
