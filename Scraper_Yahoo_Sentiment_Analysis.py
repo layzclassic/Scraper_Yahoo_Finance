@@ -4,8 +4,8 @@ import os
 from datetime import datetime
 import os
 import os.path
-import numpy as np
 
+# lg for accuracy
 nlp = spacy.load("en_core_web_sm")
 
 class Sentiment:
@@ -15,14 +15,17 @@ class Sentiment:
         self.total_downvote = 0
         self.count = 0
         self.message = []
+        self.doc = ''
 
     def add_data_row(self, data_row):
-        # self.sentiment_data_rows.append(data_row)
         self.count += 1
         self.total_upvote += data_row.upvote
         self.total_downvote += data_row.downvote
-        self.message.extend(data_row.message)
+        self.message.append(data_row.message)
 
+    def list_to_doc(self, list):
+        text = ''
+        self.doc = nlp(text.join(list))
 
 class Sentiment_data_row:
     def __init__(self, index, row):
@@ -42,11 +45,11 @@ sentiment_types = {'Bullish': bullish, 'Bearish': bearish, 'Neutral': neutral}
 def main(file, path):
     df = pd.read_csv(os.path.join(path, file), index_col=None)
     # drop null values and set 'Sentiment as index
-    print(df[df.columns[0]].count())
     cleaned_data = clean_dataframe(df)
     # append messages to respective list
     parse_data(cleaned_data)
-    print(cleaned_data[cleaned_data.columns[0]].count())
+    # process messages
+
     # save(summary, file, path)
     save(file, path)
 
@@ -90,6 +93,9 @@ def parse_data(cleaned_data):
             # match row to dictionary
             sentiment = sentiment_types[data.sentiment_type]
             sentiment.add_data_row(data)
+    for sentiment_type in sentiment_types.values():
+        # convert object to string and create Doc container
+        sentiment_type.str = sentiment_type.list_to_doc(sentiment_type.message)
 
 
 def save(file, path):
