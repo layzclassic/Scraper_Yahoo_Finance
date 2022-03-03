@@ -1,16 +1,14 @@
 import os.path
-
 import spacy
 import textacy
 from spacy import displacy
 import pandas as pd
-from spacy.lang.en import English
 from spacy.pipeline import EntityRuler
-import json
-import re
+from collections import Counter
 from spacytextblob.spacytextblob import SpacyTextBlob
 
 # Training_data = [(text, {'entities': [(start, end, label)]})]
+# pip install spacy[transformers]
 
 # lg for accuracy
 nlp = spacy.load("en_core_web_sm")
@@ -25,9 +23,9 @@ def main(ticker_list, file, path):
     # process with spacy
     doc = load_doc(data)
     # data visualization with DisplaCy
-    visual_doc(doc, file)
+    visual_doc(doc)
     # save data to csv
-    #save_csv(data)
+    ent_count(doc)
     print('complete')
 
 
@@ -37,15 +35,20 @@ def load_text(file, path):
     return text
 
 
-def save_file(file_name, file_type, path, data):
+def remove_file_type(file_name):
+    name = file_name.strip().split(".")[0]
+    return name
+
+
+def save_file(file, file_name, path, data):
     # change format
-    file_name = file_name.strip().split(".")[0] + file_type
+    outname = remove_file_type(file) + file_name
     try:
-        with open(os.path.join(path, file_name), 'w', encoding="utf-8") as f:
+        with open(os.path.join(path, outname), 'w', encoding="utf-8") as f:
             f.write(data)
-        print('file saved: ', path, ' - ', file_name)
+        print('file saved: ', path, ' - ', outname)
     except Exception as e:
-        print('file saved: ', file_name, ' - ', e)
+        print('file saved: ', outname, ' - ', e)
 
 
 def load_doc(text):
@@ -58,34 +61,84 @@ def load_tsv(ticker_list):
     return df
 
 
-def save_csv(data, file_name):
-    output_df = pd.DataFrame(data, index=True)
+def save_csv(file, data, path, file_name):
+    outname = remove_file_type(file) + '_' + file_name + '.csv'
+    output_df = pd.DataFrame(data, index=None)
     try:
-        output_df.to_csv(os.path.join(path, file_name))
-        print('saved to {}'.format(path))
+        output_df.to_csv(os.path.join(path, outname))
+        print('csv saved to {} - '.format(path), outname)
     except Exception as e:
-        print('saving file failed: ', e)
+        print('saving csv file failed: ', e)
+
 
 def find_tickers(df):
-    patterns = []
-    patterns_config = {'overwrite_ents': 'true'}
+    patterns = [{"label": "BUY", "pattern": '(?i)buy'}, {"label": "SELL", "pattern": '(?i)sell'}, {"label": "STOCK", "pattern": '(?i)wish'}]
     letters = '[A-Z]'
     symbols = df.Symbol.tolist()
-    # companies = df.CompanyName.tolist()
+    companies = df.CompanyName.tolist()
 
     # list of entities and patterns
     for symbol in symbols:
         patterns.append({'label': 'STOCK', 'pattern': symbol})
-        # for letter in letters:
-        #     patterns.append({'label': 'STOCK', 'pattern': symbol + f".{letter}"})
-    # for company in companies:
-    #     patterns.append({'label': 'COMPANY', 'pattern': company})
+        for letter in letters:
+            patterns.append({'label': 'STOCK', 'pattern': symbol + f".{letter}"})
+    for company in companies:
+        patterns.append({'label': 'COMPANY', 'pattern': company})
 
-    # create entity ruler
-    ruler = nlp.add_pipe('entity_ruler', before='ner')
-    #EntityRuler(nlp, config=patterns_config)
+    # Construction via add_pipe
+    # config = {"phrase_matcher_attr": "LOWER", 'overwrite_ents': 'true'}
+    ruler = nlp.add_pipe('entity_ruler', config={'overwrite_ents': 'true'}, before='ner')  # add config
+    # Construction from class
+    # entity_ruler = nlp.add_pipe("entity_ruler", after='parser')
+    # entity_ruler.initialize(lambda: [], nlp=nlp, patterns=patterns)
+
     ruler.add_patterns(patterns)
 
+
+def ent_count(doc):
+    money = []
+    stock = []
+    final_list = []
+
+    for ent in doc.ents:
+        if ent.label_ == 'MONEY':
+            money.append(str(ent))
+        elif ent.label_ == "STOCK":
+            stock.append(str(ent))
+
+    cm = Counter(money)
+    for p, count in cm.most_common():
+        final_list.append({
+            'name': p,
+            'type': 'MONEY',
+            'frequency': count
+        })
+
+    cs = Counter(stock)
+    for l, count in cs.most_common():
+        final_list.append({
+            'name': l,
+            'type': 'STOCK',
+            'frequency': count
+        })
+    file_name= 'ent_counter'
+    save_csv(file, final_list, path, file_name)
+
+
+def visual_doc(doc):
+    # change HEX colors
+    colors = {'Wish': '#66abff', 'buy': '#66ff78', 'sell': '#FF5733'}
+    #options = {'ents': ['Wish', 'buy', 'sell'], 'colors':colors}
+    html = displacy.render(doc, style='ent') #, options=options
+    file_name = '_displacy_visual.html'
+    save_file(file, file_name, path, html)
+
+
+if __name__ == '__main__':
+    file = 'Bullish_text_sample.txt'
+    ticker_list = 'data/stocks.tsv'
+    path = r'C:\Users\suen6\PycharmProjects\Scraper_Yahoo_Finance\data'
+    main(ticker_list, file, path)
 
 # for sentence in sentences:
 #     # look for name entities
@@ -110,22 +163,3 @@ def find_tickers(df):
 #
 # for verb_phrase in verb_phrases:
 #     print(verb_phrase, verb_phrase.lemma_)
-
-#def get_price(text):
-
-
-def visual_doc(doc, file):
-    # change HEX colors
-    colors = {'Wish': '#66abff', 'buy': '#66ff78', 'sell': '#FF5733'}
-    #options = {'ents': ['Wish', 'buy', 'sell'], 'colors':colors}
-    html = displacy.render(doc, style='ent') #, options=options
-    file_type = '.html'
-    file_name = file
-    save_file(file_name, file_type, path, html)
-
-
-if __name__ == '__main__':
-    file = 'Bullish_text_sample.txt'
-    ticker_list = 'data/stocks.tsv'
-    path = r'C:\Users\suen6\PycharmProjects\Scraper_Yahoo_Finance\data'
-    main(ticker_list, file, path)
